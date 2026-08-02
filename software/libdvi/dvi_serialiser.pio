@@ -1,11 +1,11 @@
 .program dvi_serialiser
-.side_set 2
+.side_set 2 opt
 .origin 0
 
 ; Single-ended -> differential serial
 
-	out pc, 1    side 0b10
-	out pc, 1    side 0b01
+	out pc, 1     side 0b10
+	out pc, 1     side 0b01
 
 .program dvi_serialiser_debug
 .side_set 1 opt
@@ -30,8 +30,15 @@
 #include "dvi_config_defs.h"
 
 static inline void dvi_serialiser_program_init(PIO pio, uint sm, uint offset, uint data_pins, bool debug) {
-    pio_sm_set_pins_with_mask(pio, sm, 2u << data_pins, 3u << data_pins);
-    pio_sm_set_pindirs_with_mask(pio, sm, ~0u, 3u << data_pins);
+    // Use the 64-bit pin-mask variants: on RP2350B, TMDS data pins can be
+    // >= 32 (e.g. GPIO32-39 on the Waveshare RP2350-PiZero), and the 32-bit
+    // pio_sm_set_pins_with_mask()/pio_sm_set_pindirs_with_mask() cannot
+    // address those pins at all (shifting a uint32_t by >= 32 is undefined
+    // behaviour, and silently fails to configure the intended GPIOs as PIO
+    // outputs - producing no valid TMDS data on the affected lanes even
+    // though the rest of the pipeline appears to initialise successfully).
+    pio_sm_set_pins_with_mask64(pio, sm, 2ULL << data_pins, 3ULL << data_pins);
+    pio_sm_set_pindirs_with_mask64(pio, sm, ~0ULL, 3ULL << data_pins);
     pio_gpio_init(pio, data_pins);
     pio_gpio_init(pio, data_pins + 1);
 
